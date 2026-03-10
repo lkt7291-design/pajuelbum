@@ -1,119 +1,178 @@
-# CLAUDE.md
+# CLAUDE.md — 지원주거센터 장기 사례관리 시스템
 
-This file provides guidance for AI assistants (Claude and others) working in this repository.
-
-## Repository Status
-
-This repository is currently in its **initial state** — no source files or commits exist yet. This CLAUDE.md should be updated as the project is built out.
-
-- **Remote**: `http://local_proxy@127.0.0.1:35237/git/lkt7291-design/pajuelbum`
-- **Organization/Repo**: `lkt7291-design/pajuelbum`
+AI 어시스턴트가 이 프로젝트를 처음 열었을 때 즉시 맥락을 파악할 수 있도록 작성된 프로젝트 설명서입니다.
 
 ---
 
-## Git & Branch Conventions
+## 1. 프로젝트 개요
 
-### Branch naming
-- Feature/task branches follow the pattern: `claude/<descriptor>-<session-id>`
-- Example: `claude/claude-md-mml9a0ibzvkcuuud-tLcYv`
-- **Never push to `main` or `master` directly** without explicit permission.
+| 항목 | 내용 |
+|---|---|
+| **시스템명** | 지원주거센터 장기 사례관리 시스템 |
+| **운영 기간** | 20년 장기 운영 |
+| **대상** | 입주자 최대 50명 |
+| **핵심 목표** | 입주자의 생애주기 기록 + 개인정보 보호 + 데이터 분석 효율 동시 달성 |
+| **플랫폼** | Microsoft Power Platform |
 
-### Pushing changes
-Always use:
-```bash
-git push -u origin <branch-name>
-```
-
-If a push fails due to a network error, retry with exponential backoff: 2 s → 4 s → 8 s → 16 s (max 4 retries).
-
-### Commit messages
-- Use clear, imperative-mood subject lines (e.g. `Add user authentication`, `Fix null pointer in parser`).
-- Keep the subject line under 72 characters.
-- Add a blank line and a longer body when extra context is needed.
+### 시스템이 해결하는 문제
+- 장기 입주자의 생애 전반에 걸친 사례 데이터를 구조적으로 기록·관리
+- 개인 신원정보(Identity)와 사례·활동 데이터를 **물리적으로 분리**하여 개인정보 보호
+- 다수의 복지사가 동시에 접근하는 환경에서 데이터 충돌 방지
 
 ---
 
-## Development Workflow
+## 2. 기술 스택
 
-> **Note**: The sections below are placeholders. Fill them in once the project stack is chosen.
+| 레이어 | 기술 | 역할 |
+|---|---|---|
+| **Frontend** | MS Power Apps (Canvas App) | UI / UX, 사용자 인터페이스 |
+| **Database** | SharePoint Online (Lists & Document Library) | 데이터 저장소, 파일 저장소 |
+| **Backend / Automation** | Power Automate (Cloud Flows) | 업무 자동화, 배치 작업, 알림 |
 
-### Prerequisites
-<!-- List required runtime versions, tools, or system dependencies here. Example:
-- Node.js >= 20
-- Python >= 3.11
-- Docker >= 24
--->
-
-### Installation
-```bash
-# Example — replace with actual commands once a package manager is chosen
-# npm install
-# pip install -r requirements.txt
-# cargo build
-```
-
-### Running the project
-```bash
-# Example
-# npm run dev
-# python -m myapp
-```
-
-### Running tests
-```bash
-# Example
-# npm test
-# pytest
-# cargo test
-```
-
-### Linting / formatting
-```bash
-# Example
-# npm run lint
-# ruff check . && ruff format .
-# cargo clippy
-```
+> SharePoint는 관계형 DB가 아님을 항상 인지할 것. 조인 대신 ResidentID 기반 참조로 데이터를 연결한다.
 
 ---
 
-## Project Structure
+## 3. 핵심 운영 로직
 
-> **Note**: Update this section once source files exist.
+### 3-1. 점유 제어 (Soft Lock)
+- **방식**: 선착순 Soft Lock
+- **자동 해제**: 1시간 후 자동 해제
+- **관리자 권한**: 실시간 강제 해제 가능 (마스터 언락)
+- **목적**: 다수 복지사의 동시 편집으로 인한 데이터 충돌 방지
+- **주의**: Excel Online 커넥터 사용 시 동시 편집 에러 처리 로직이 반드시 필요함
+
+### 3-2. 데이터 보존 (논리적 삭제)
+- 데이터는 **절대 물리적으로 삭제하지 않는다**
+- 삭제 = `Status` 필드 값 변경 (예: `Active` → `Deleted`)
+- 이유: 20년 장기 기록 보존 의무, 감사 추적 필요
+
+### 3-3. 자동화 (3-Tier 파일 생성)
+입주 이벤트 발생 시 Power Automate가 자동으로 아래 3개 파일과 폴더를 생성:
 
 ```
-pajuelbum/
-├── CLAUDE.md          # This file
-└── (project files TBD)
+지원주거센터 / {팀명} / {ResidentID}_{성함} /
+├── 📂 01_Identity    →  Identity_{ID}.xlsx   (M1)
+├── 📂 02_CaseFile    →  CaseFile_{ID}.xlsx   (M2, M3, M5, M6)
+└── 📂 03_Activity    →  Activity_{ID}.xlsx   (M4)
 ```
 
----
-
-## Key Conventions
-
-These conventions should be followed as the codebase grows:
-
-1. **Keep changes minimal** — only modify what is directly requested or clearly necessary.
-2. **No over-engineering** — avoid adding abstractions, error handling, or features beyond the current task.
-3. **Security first** — never introduce SQL injection, XSS, command injection, or other OWASP top-10 vulnerabilities.
-4. **No secrets in code** — use environment variables for credentials and API keys; never commit `.env` files.
-5. **Test coverage** — write tests for new logic; do not ship untested code.
-6. **Comments** — only add comments where the logic is not self-evident.
+### 3-4. 야간 배치 작업
+- 신규 필드 추가, 구조 변경 등 **스키마 변경은 야간 배치 시 일괄 적용**
+- 운영 시간 중 구조 변경 금지
+- 버전 이력은 `M0_SystemInfo` SharePoint 리스트에 기록
 
 ---
 
-## Environment Variables
+## 4. 폴더 구조 (SharePoint Document Library)
 
-> **Note**: Add a `.env.example` file listing all required variables (with placeholder values) once the project has environment-dependent configuration. Never commit real secrets.
+```
+지원주거센터/
+└── {팀명}/
+    └── {ResidentID}_{성함}/          ← 예: 240001001_홍길동
+        ├── 01_Identity/
+        │   └── Identity_{ID}.xlsx    ← 신분증 정보 (M1)
+        ├── 02_CaseFile/
+        │   └── CaseFile_{ID}.xlsx    ← 사례관리 마스터 (M2, M3, M5, M6)
+        └── 03_Activity/
+            └── Activity_{ID}.xlsx    ← 과정기록 로그 (M4)
+```
+
+### 폴더 생성 시 주의사항
+- 성함에 특수문자(`/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, `#`, `%`)가 포함된 경우 **반드시 치환 처리** 후 폴더명 생성
+- SharePoint 경로 길이 제한(400자) 초과 주의
 
 ---
 
-## CI/CD
+## 5. 데이터 & 코드 컨벤션
 
-> **Note**: Document the CI/CD pipeline here once it is configured (GitHub Actions, GitLab CI, etc.).
+### 5-1. 식별자 (ResidentID)
+- **모든 데이터의 Primary Key는 9자리 ResidentID**
+- 형식: `{연도 2자리}{팀코드 2자리}{순번 3자리}` (예: `240001001`)
+- 테이블 간 조인 없이 ResidentID로만 데이터를 참조한다
+
+### 5-2. 변수 명명 규칙 (Power Apps)
+
+| 접두사 | 범위 | 예시 |
+|---|---|---|
+| `var_` | 전역 변수 (Set 함수) | `var_CurrentResident` |
+| `loc_` | 지역 변수 (UpdateContext) | `loc_IsLoading` |
+| `col_` | 컬렉션 (Collect/ClearCollect) | `col_ResidentList` |
+
+### 5-3. 테이블명 규칙 (Excel 내 표)
+
+```
+Tbl_M{마스터번호}_{테이블명}
+```
+
+| 예시 | 설명 |
+|---|---|
+| `Tbl_M1_Identity` | M1 신원정보 테이블 |
+| `Tbl_M2_CaseBasic` | M2 사례 기본정보 테이블 |
+| `Tbl_M4_ActivityLog` | M4 과정기록 테이블 |
 
 ---
 
-## Updating This File
+## 6. 시스템 운영 규칙
 
-Whenever significant project decisions are made — tech stack selection, new tooling, architectural patterns — update the relevant section of this file so future AI sessions start with accurate context.
+1. **예약 업데이트**: 신규 필드 추가 등 구조 변경은 야간 배치 작업 시 일괄 적용. 운영 시간 중 스키마 변경 금지.
+2. **마스터 언락**: 관리자 권한을 통한 실시간 점유 강제 해제 지원. 일반 사용자는 1시간 자동 해제 대기.
+3. **버전 관리**: `M0_SystemInfo` SharePoint 리스트를 통해 업데이트 이력 기록. 변경 사항 발생 시 반드시 이 리스트에 기록.
+4. **논리적 삭제 원칙**: 어떤 경우에도 데이터를 물리적으로 삭제하지 않는다. 항상 `Status` 필드 변경으로 처리.
+
+---
+
+## 7. 주의사항 (AI 어시스턴트 필독)
+
+### ⚠️ 개인정보 격리 — 최우선 규칙
+- **AI 분석 시 `01_Identity` 폴더 및 `Identity_{ID}.xlsx` 파일 참조 절대 금지**
+- 신원정보(이름, 주민번호, 주소, 연락처 등)는 분석 대상에서 완전히 제외
+- 분석이 필요한 경우 `02_CaseFile`, `03_Activity` 데이터만 사용
+
+### ⚠️ 파일 잠금 에러 처리
+- Excel Online 커넥터는 동시 편집 시 에러(`FileLocked`) 발생 가능
+- 모든 Excel 쓰기 로직에는 **재시도(Retry) 및 에러 처리 분기**가 필수
+- Power Automate에서 `Try-Catch` 스코프로 감싸고, 실패 시 담당자 알림 플로우 연결
+
+### ⚠️ 특수문자 치환
+- 폴더 생성 전 성함에서 아래 문자 치환 필수:
+
+| 특수문자 | 치환값 |
+|---|---|
+| `/` `\` | `-` |
+| `:` `*` `?` `"` `<` `>` `\|` | `_` |
+| `#` `%` | (제거) |
+
+---
+
+## 8. SharePoint 리스트 구조 (메타데이터)
+
+> 실제 데이터는 Excel 파일에 저장되고, SharePoint 리스트는 메타데이터 및 시스템 운영 정보 관리에 사용
+
+| 리스트명 | 용도 |
+|---|---|
+| `M0_SystemInfo` | 시스템 버전, 업데이트 이력 |
+| `M_ResidentIndex` | 입주자 목록 및 점유 상태(Soft Lock) |
+| *(추가 리스트는 확정 시 기재)* | |
+
+---
+
+## 9. Git & 배포 규칙
+
+- **브랜치 명명**: `claude/<설명>-<세션ID>` 형식
+- **직접 push 금지**: `main` / `master`에 직접 push하지 않는다
+- **배포 단위**: 야간 배치 적용 주기에 맞춰 릴리즈
+- **push 명령**: `git push -u origin <branch-name>`
+
+---
+
+## 10. 업데이트 이력
+
+| 날짜 | 내용 |
+|---|---|
+| 2026-03-10 | 최초 작성 — 프로젝트 개요, 기술 스택, 운영 로직, 컨벤션 정의 |
+
+---
+
+> 이 파일은 프로젝트가 발전함에 따라 지속적으로 업데이트해야 합니다.
+> 새로운 규칙, 필드, 자동화 플로우가 추가될 때마다 해당 섹션을 갱신하세요.
