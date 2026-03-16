@@ -4,30 +4,73 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="mobile-web-app-capable" content="yes">
   <title>가계부</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
 
+  <!-- ========== 로딩 오버레이 ========== -->
+  <div id="loading-overlay" style="display:none">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <p id="loading-msg">불러오는 중...</p>
+    </div>
+  </div>
+
   <!-- ========== HEADER ========== -->
   <header class="app-header">
     <button class="header-btn" id="btn-back" onclick="App.goBack()" style="display:none">← 뒤로</button>
     <h1 class="header-title" id="header-title">가계부</h1>
-    <span class="header-user" id="header-user"></span>
+    <button class="header-btn" id="btn-settings" onclick="App.showScreen('settings')" title="설정">⚙</button>
   </header>
 
-  <!-- ========== SCREEN: 최초 설정 ========== -->
+  <!-- ========== SCREEN: 초기 설정 (URL + 이름) ========== -->
   <section class="screen" id="screen-setup">
     <div class="screen-content centered">
       <div class="setup-card">
         <div class="setup-icon">📒</div>
-        <h2>가계부</h2>
-        <p>처음 사용하시나요? 이름을 입력해주세요</p>
-        <input type="text" id="setup-name" class="form-input" placeholder="이름 (예: 김복지)" maxlength="20"
-               onkeydown="if(event.key==='Enter') App.setup()">
-        <button class="btn btn-primary btn-full" onclick="App.setup()">시작하기</button>
+        <h2>가계부 설정</h2>
+        <p>Google Apps Script URL과 이름을 입력하세요</p>
+        <div class="form-group">
+          <label class="form-label">Apps Script URL *</label>
+          <input type="url" id="setup-url" class="form-input"
+                 placeholder="https://script.google.com/macros/s/.../exec">
+          <span class="form-hint">backend/SETUP.md 참고</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">내 이름 *</label>
+          <input type="text" id="setup-name" class="form-input"
+                 placeholder="예: 김복지" maxlength="20"
+                 onkeydown="if(event.key==='Enter') App.setup()">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="App.setup()">연결 테스트 후 시작</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ========== SCREEN: 설정 변경 ========== -->
+  <section class="screen" id="screen-settings">
+    <div class="screen-content">
+      <div class="card">
+        <h3 style="margin-bottom:16px">서버 설정</h3>
+        <div class="form-group">
+          <label class="form-label">Apps Script URL</label>
+          <input type="url" id="settings-url" class="form-input" placeholder="https://script.google.com/...">
+        </div>
+        <div class="form-group">
+          <label class="form-label">내 이름</label>
+          <input type="text" id="settings-name" class="form-input" maxlength="20">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="App.saveSettings()">저장</button>
+        <button class="btn btn-outline btn-full" onclick="App.testConnection()">연결 테스트</button>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3 style="margin-bottom:16px">앱 정보</h3>
+        <p style="font-size:14px;color:var(--text-light)">
+          데이터 저장소: Google Drive (Google Sheets)<br>
+          월별 시트탭으로 데이터 누적 관리
+        </p>
       </div>
     </div>
   </section>
@@ -40,8 +83,8 @@
         <button class="btn btn-sm btn-outline" onclick="App.showScreen('admin')">⚙ 관리</button>
       </div>
       <div class="search-bar">
-        <input type="text" id="search-resident" class="form-input" placeholder="🔍 이름 검색"
-               oninput="App.filterResidents(this.value)">
+        <input type="text" id="search-resident" class="form-input"
+               placeholder="🔍 이름 검색" oninput="App.filterResidents(this.value)">
       </div>
       <div id="resident-list" class="resident-list"></div>
       <div class="empty-state" id="no-residents" style="display:none">
@@ -55,13 +98,11 @@
   <!-- ========== SCREEN: 가계부 홈 ========== -->
   <section class="screen" id="screen-home">
     <div class="screen-content">
-      <!-- 월 이동 -->
       <div class="month-nav">
         <button class="btn btn-icon" onclick="App.prevMonth()">&#8592;</button>
         <span id="home-month-label" class="month-label"></span>
         <button class="btn btn-icon" onclick="App.nextMonth()">&#8594;</button>
       </div>
-      <!-- 요약 카드 -->
       <div class="summary-card">
         <div class="summary-row">
           <span class="summary-label">수입</span>
@@ -77,22 +118,21 @@
           <span class="summary-amount bold" id="home-balance">₩0</span>
         </div>
       </div>
-      <!-- 카테고리 요약 -->
       <div class="card" id="home-categories" style="display:none"></div>
-      <!-- 최근 내역 -->
       <div class="section-header" style="margin-top:16px">
         <h3>최근 내역</h3>
         <button class="btn btn-sm btn-text" onclick="App.showScreen('list')">전체보기</button>
       </div>
       <div id="home-recent" class="item-list"></div>
-      <!-- 엑셀 저장 -->
-      <div style="margin-top:16px">
-        <button class="btn btn-success btn-full" onclick="Excel.exportMonth()">
-          📊 이달 내역 엑셀 저장 / 인쇄
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn btn-outline btn-flex" onclick="Excel.exportMonth()">
+          📊 이달 엑셀
+        </button>
+        <button class="btn btn-success btn-flex" onclick="Excel.exportAllMonths()">
+          📋 전체 월별 엑셀
         </button>
       </div>
     </div>
-    <!-- 하단 입력 버튼 (홈에서만 표시) -->
     <div class="bottom-actions">
       <button class="btn-action" onclick="App.showAddIncome()">
         <span>💵</span><span>수입</span>
@@ -112,14 +152,13 @@
   <!-- ========== SCREEN: 지출 추가/수정 ========== -->
   <section class="screen" id="screen-expense">
     <div class="screen-content">
-      <!-- 영수증 이미지 미리보기 -->
-      <div id="receipt-preview-area" style="display:none" class="card" style="padding:12px">
+      <div id="receipt-preview-area" style="display:none" class="card">
         <img id="receipt-img" class="receipt-preview" alt="영수증">
-        <p class="hint-text">이미지를 보며 아래 내용을 입력해주세요</p>
+        <p class="hint-text">이미지를 보며 내용을 입력해주세요</p>
       </div>
-      <!-- 지출 입력 폼 -->
       <form id="expense-form" onsubmit="App.saveExpense(event)">
         <input type="hidden" id="expense-id">
+        <input type="hidden" id="expense-yearmonth">
         <div class="form-group">
           <label class="form-label">날짜 *</label>
           <input type="date" id="expense-date" class="form-input" required>
@@ -168,7 +207,6 @@
           <button type="submit" class="btn btn-primary btn-flex">저장</button>
         </div>
       </form>
-      <!-- 영수증 파일 입력 (숨김) -->
       <input type="file" id="receipt-file" accept="image/*" capture="environment"
              style="display:none" onchange="App.handleReceiptFile(this)">
     </div>
@@ -179,6 +217,7 @@
     <div class="screen-content">
       <form id="income-form" onsubmit="App.saveIncome(event)">
         <input type="hidden" id="income-id">
+        <input type="hidden" id="income-yearmonth">
         <div class="form-group">
           <label class="form-label">날짜 *</label>
           <input type="date" id="income-date" class="form-input" required>
@@ -190,8 +229,7 @@
         </div>
         <div class="form-group">
           <label class="form-label">금액 (원) *</label>
-          <input type="number" id="income-amount" class="form-input"
-                 placeholder="0" min="0" required>
+          <input type="number" id="income-amount" class="form-input" placeholder="0" min="0" required>
         </div>
         <div class="form-group">
           <label class="form-label">카테고리</label>
@@ -236,8 +274,7 @@
       <div class="list-summary card" id="list-summary"></div>
       <div id="expense-list" class="item-list"></div>
       <div class="empty-state" id="no-expenses" style="display:none">
-        <div class="empty-icon">📭</div>
-        <p>내역이 없습니다</p>
+        <div class="empty-icon">📭</div><p>내역이 없습니다</p>
       </div>
     </div>
   </section>
@@ -250,23 +287,6 @@
         <button class="btn btn-sm btn-primary" onclick="App.showAddResident()">+ 추가</button>
       </div>
       <div id="admin-resident-list" class="item-list"></div>
-
-      <div class="section-header" style="margin-top:28px">
-        <h3>데이터 관리</h3>
-      </div>
-      <div class="data-actions">
-        <button class="btn btn-outline btn-full" onclick="Excel.exportAll()">
-          📊 전체 데이터 엑셀 내보내기
-        </button>
-        <label class="btn btn-outline btn-full" style="cursor:pointer;text-align:center">
-          📂 엑셀에서 데이터 가져오기 (병합)
-          <input type="file" accept=".xlsx,.xls" style="display:none"
-                 onchange="Excel.importFromFile(this)">
-        </label>
-        <button class="btn btn-danger-outline btn-full" onclick="App.confirmClearData()">
-          🗑️ 전체 데이터 초기화
-        </button>
-      </div>
     </div>
   </section>
 
@@ -313,9 +333,7 @@
       </div>
       <div class="scanner-container">
         <video id="scanner-video" class="scanner-video" autoplay muted playsinline></video>
-        <div class="scanner-overlay">
-          <div class="scanner-frame"></div>
-        </div>
+        <div class="scanner-overlay"><div class="scanner-frame"></div></div>
       </div>
       <div class="modal-body">
         <p class="hint-text" style="text-align:center">카메라가 QR코드 또는 바코드를 자동 인식합니다</p>
@@ -327,14 +345,14 @@
   <!-- ========== TOAST ========== -->
   <div id="toast" class="toast" style="display:none"></div>
 
-</div><!-- #app -->
+</div>
 
-<!-- ========== 라이브러리 ========== -->
+<!-- 라이브러리 -->
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="https://unpkg.com/@zxing/library@0.20.0-beta.3/umd/index.min.js"></script>
 
-<!-- ========== 앱 스크립트 ========== -->
-<script src="js/db.js"></script>
+<!-- 앱 (db.js 제거 → api.js 사용) -->
+<script src="js/api.js"></script>
 <script src="js/excel.js"></script>
 <script src="js/scanner.js"></script>
 <script src="js/app.js"></script>
