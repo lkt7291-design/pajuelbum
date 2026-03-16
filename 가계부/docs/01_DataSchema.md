@@ -24,6 +24,7 @@
 | 컬럼명 | 타입 | 필수 | 설명 |
 |---|---|---|---|
 | `ExpenseID` | 텍스트 | ✅ | 고유 ID: `EXP-{연도}{월}{순번5자리}` |
+| `ResidentID` | 텍스트 | ✅ | 담당 인원 ID (Tbl_Residents 참조) |
 | `Date` | 날짜 | ✅ | 지출 날짜 |
 | `StoreName` | 텍스트 | ✅ | 상호명 (OCR 추출) |
 | `Category` | 텍스트 | ✅ | 카테고리 (아래 Tbl_Categories 참조) |
@@ -41,6 +42,8 @@
 | `CreatedBy` | 텍스트 | ✅ | 작성자 (Office 365 사용자명) |
 | `CreatedAt` | 날짜시간 | ✅ | 생성 일시 |
 | `ModifiedAt` | 날짜시간 |   | 최종 수정 일시 |
+| `LockedBy` | 텍스트 |   | 현재 수정 중인 복지사 이메일 (Soft Lock) |
+| `LockedAt` | 날짜시간 |   | 잠금 시작 시각 (60분 후 자동 만료) |
 | `Status` | 텍스트 | ✅ | `Active` / `Deleted` (논리적 삭제) |
 
 ### ExpenseID 생성 규칙
