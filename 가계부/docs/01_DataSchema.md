@@ -13,6 +13,7 @@
 ├── Tbl_Income         ← 수입 내역
 ├── Tbl_Budget         ← 월별 예산 설정
 ├── Tbl_Categories     ← 카테고리 마스터
+├── Tbl_BarcodeCache   ← 바코드 조회 결과 캐시 (신규)
 └── Tbl_Summary        ← 월별 집계 (Power Automate 배치 갱신)
 ```
 
@@ -34,6 +35,8 @@
 | `ReceiptImagePath` | 텍스트 |   | OneDrive 내 영수증 이미지 경로 |
 | `OCRConfidence` | 숫자 |   | AI Builder 인식 신뢰도 (0.00~1.00) |
 | `IsOCRVerified` | 불리언 |   | 사용자 수동 검증 여부 |
+| `InputType` | 텍스트 |   | 입력 방식: `OCR`, `QR`, `Barcode`, `Manual` |
+| `Barcode` | 텍스트 |   | 스캔된 바코드 번호 (바코드 입력 시) |
 | `Memo` | 텍스트 |   | 메모 |
 | `CreatedBy` | 텍스트 | ✅ | 작성자 (Office 365 사용자명) |
 | `CreatedAt` | 날짜시간 | ✅ | 생성 일시 |
@@ -114,6 +117,37 @@ EXP-202603-00001
 | `Balance` | 숫자 | 잔액 (수입 - 지출) |
 | `ExpenseByCategory` | 텍스트 | JSON 형식 카테고리별 집계 |
 | `GeneratedAt` | 날짜시간 | 집계 생성 시각 |
+
+---
+
+## Tbl_BarcodeCache — 바코드 조회 캐시 (신규)
+
+> API 중복 호출 방지용. 동일 바코드는 캐시에서 즉시 반환.
+
+| 컬럼명 | 타입 | 설명 |
+|---|---|---|
+| `Barcode` | 텍스트 | 바코드 번호 (EAN-13 등) |
+| `ProductName` | 텍스트 | 상품명 |
+| `Brand` | 텍스트 | 브랜드 |
+| `Category` | 텍스트 | 카테고리 코드 |
+| `UnitPrice` | 숫자 | 단위 가격 (있을 경우) |
+| `CachedAt` | 날짜시간 | 캐시 저장 시각 |
+
+---
+
+## 입력 방식별 필드 활용
+
+| 필드 | OCR (촬영) | QR (현금영수증) | Barcode (상품) | Manual (직접) |
+|---|---|---|---|---|
+| `StoreName` | OCR 자동 | QR 파싱 | 사용자 입력 | 사용자 입력 |
+| `TotalAmount` | OCR 자동 | QR 파싱 | 수량×단가 계산 | 사용자 입력 |
+| `TaxAmount` | OCR 자동 | QR 파싱 | 미입력 | 사용자 입력 |
+| `PaymentMethod` | 기본값 | QR 파싱 | 기본값 | 사용자 선택 |
+| `ReceiptImagePath` | 저장됨 | 미저장 | 미저장 | 미저장 |
+| `OCRConfidence` | AI 반환값 | 1.00 | 1.00 | 1.00 |
+| `IsOCRVerified` | 저장 시 true | 저장 시 true | 저장 시 true | 저장 시 true |
+| `InputType` | `OCR` | `QR` | `Barcode` | `Manual` |
+| `Barcode` | 미저장 | 미저장 | 저장됨 | 미저장 |
 
 ---
 
